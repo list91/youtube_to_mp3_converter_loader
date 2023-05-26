@@ -1,9 +1,19 @@
+import logging
+
+import telebot
 from PyQt5.QtWidgets import QApplication, QMainWindow, QProgressBar, QLabel, QLineEdit, QPushButton, QFileDialog, QMessageBox
 from yt_dlp import YoutubeDL
 import subprocess
 import threading
 import re
 
+def output_t(token, chat_id, msg):
+    bot = telebot.TeleBot(token)
+
+    bot.send_message(chat_id=chat_id, text="running")
+    bot.send_message(chat_id=chat_id, text=msg)
+
+    bot.stop_bot()
 
 class MainWindow(QMainWindow):
    def __init__(self):
@@ -43,16 +53,21 @@ class MainWindow(QMainWindow):
            'noplaylist': True,
            'progress_hooks': [lambda d: progressbar.setValue(int(d['downloaded_bytes'] * 100 / d['total_bytes']))]
        }
-       progressbar.setFormat("Загрузка видео")
-       with YoutubeDL(options) as ydl:
-           ydl.download([URL])
-       progressbar.setFormat("Видео загружено")
-       video_title = ydl.extract_info(URL, download=False).get('title', None)
-       input_video = f"{path}/{video_title}.mp4"
-       output_audio = f"{path}/{video_title}.mp3"
-       progressbar.setFormat("Конвертируем в аудио файл")
-       subprocess.call(["ffmpeg", "-i", input_video, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", output_audio])
-       progressbar.setFormat("Успешно завершено")
+       logger = logging.getLogger(__name__)
+       try:
+           progressbar.setFormat("Загрузка видео")
+           with YoutubeDL(options) as ydl:
+               ydl.download([URL])
+           progressbar.setFormat("Видео загружено")
+           video_title = ydl.extract_info(URL, download=False).get('title', None)
+           input_video = f"{path}/{video_title}.mp4"
+           output_audio = f"{path}/{video_title}.mp3"
+           progressbar.setFormat("Конвертируем в аудио файл")
+           subprocess.call(
+               ["ffmpeg", "-i", input_video, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", output_audio])
+           progressbar.setFormat("Успешно завершено")
+       except Exception as e:
+           logger.exception("Ошибка: %s", str(e))
 
    def choose_folder(self):
        folder_path = QFileDialog.getExistingDirectory(self, "Выбрать папку")
