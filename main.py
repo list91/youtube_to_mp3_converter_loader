@@ -1,5 +1,5 @@
 import datetime
-import logging
+
 import os
 import re
 import subprocess
@@ -11,7 +11,11 @@ from yt_dlp import YoutubeDL
 
 
 
-
+def convert(input_video, output_audio):
+    if os.path.isfile(output_audio):
+        os.remove(output_audio)
+    subprocess.call(["ffmpeg", "-i", input_video, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", output_audio])
+    os.remove(input_video)
 def clean_filename(text: str) -> str:
     # запрещенные символы
     forbidden = '[/\\\:\*\?"<>\|]'
@@ -69,12 +73,10 @@ class MainWindow(QMainWindow):
             options = {
                 'format': 'bestaudio[ext=mp3]/best',
                 'extractaudio': True,
-                'outtmpl': f"{path}/%(title)s_{date}.%(ext)s",
+                'outtmpl': f"{path}/%(id)s_{date}.%(ext)s",
                 'noplaylist': True,
                 'progress_hooks': [lambda d: progressbar.setValue(int(d['downloaded_bytes'] * 100 / d['total_bytes']))]
             }
-
-            logger = logging.getLogger(__name__)
 
             progressbar.setFormat("Загрузка видео")
 
@@ -82,29 +84,20 @@ class MainWindow(QMainWindow):
                 ydl.download([URL])
 
             progressbar.setFormat("Видео загружено")
-
             video_title = ydl.extract_info(URL, download=False).get('title', None)
-            input_video = f"{path}/{clean_filename(video_title)}_{date}.mp4"
+            video_id = ydl.extract_info(URL, download=False).get('id', None)
+            input_video = f"{path}/{video_id}_{date}.mp4"
             output_audio = f"{path}/{clean_filename(video_title)}.mp3"
 
             progressbar.setFormat("Конвертирование в аудио файл")
 
-            if os.path.isfile(output_audio):
-                os.remove(output_audio)
-
-            subprocess.call(["ffmpeg", "-i", input_video, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", output_audio])
-
-            os.remove(input_video)
+            # конвертируем
+            convert(input_video, output_audio)
 
             progressbar.setFormat("Успешно завершено")
 
-        except KeyError as k:
-            output_t(token, id, "(ОШИБКА) \nв директорию качается тот же файл\n" + str(k))
-            logger.exception("Ошибка: %s", str(k))
-
         except Exception as e:
             output_t(token, id, str(e))
-            logger.exception("Ошибка: %s", str(e))
 
 
 
